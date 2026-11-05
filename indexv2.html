@@ -1,0 +1,487 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>NeOlympic 応援サイト</title>
+  <style>
+    /* ===== 全体の色（チームカラーは下の CONFIG.TEAMS で変更） ===== */
+    :root {
+      --bg: #f4f5f7;      /* 背景 */
+      --card: #ffffff;    /* カード */
+      --text: #1d1f23;    /* 文字 */
+      --sub: #6b7280;     /* 補足の文字 */
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, "Hiragino Sans", "Noto Sans JP", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+    }
+
+    header {
+      text-align: center;
+      padding: 24px 16px 8px;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 1.6rem;
+      letter-spacing: 0.04em;
+    }
+
+    .lead {
+      margin: 6px 0 0;
+      color: var(--sub);
+      font-size: 0.9rem;
+    }
+
+    /* 通信エラーなどの控えめなお知らせ */
+    .status {
+      max-width: 1080px;
+      margin: 8px auto 0;
+      padding: 0 16px;
+    }
+    .status[hidden] { display: none; }
+    .status p {
+      margin: 0;
+      padding: 8px 12px;
+      border-radius: 8px;
+      background: #fff4e5;
+      color: #8a5300;
+      font-size: 0.85rem;
+    }
+
+    /* スマホは1列、広い画面は3列 */
+    main {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 16px;
+      max-width: 1080px;
+      margin: 0 auto;
+      padding: 16px;
+    }
+    @media (min-width: 720px) {
+      main { grid-template-columns: repeat(3, 1fr); }
+    }
+
+    .card {
+      position: relative;
+      background: var(--card);
+      border-radius: 16px;
+      border-top: 6px solid var(--team);
+      padding: 20px 16px;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.06);
+      text-align: center;
+    }
+
+    .team-name {
+      margin: 0;
+      font-size: 1.3rem;
+      font-weight: 700;
+      color: var(--team);
+    }
+
+    .total-label {
+      margin: 12px 0 0;
+      font-size: 0.8rem;
+      color: var(--sub);
+    }
+
+    .total {
+      margin: 2px 0 14px;
+      font-size: 2.6rem;
+      font-weight: 800;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .cheer-btn {
+      display: block;
+      width: 100%;
+      padding: 18px;
+      border: none;
+      border-radius: 999px;
+      background: var(--team);
+      color: #fff;
+      font-size: 1.2rem;
+      font-weight: 700;
+      cursor: pointer;
+      /* スマホで連打したときにダブルタップズームや文字選択が起きないようにする */
+      touch-action: manipulation;
+      user-select: none;
+      -webkit-user-select: none;
+      -webkit-tap-highlight-color: transparent;
+      transition: transform 0.06s;
+    }
+    .cheer-btn:active { transform: scale(0.96); }
+
+    .mine {
+      margin: 12px 0 0;
+      font-size: 0.9rem;
+      color: var(--sub);
+    }
+    .mine strong { color: var(--text); }
+
+    /* 押したときに浮かぶ絵文字 */
+    .float-emoji {
+      position: absolute;
+      pointer-events: none;
+      font-size: 1.8rem;
+      animation: floatUp 1s ease-out forwards;
+    }
+    @keyframes floatUp {
+      from { opacity: 1; transform: translate(-50%, 0) scale(1); }
+      to   { opacity: 0; transform: translate(-50%, -120px) scale(1.4); }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .float-emoji { animation-duration: 0.4s; }
+    }
+
+    footer {
+      text-align: center;
+      color: var(--sub);
+      font-size: 0.75rem;
+      padding: 8px 16px 24px;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>NeOlympic 応援サイト</h1>
+    <p class="lead">ボタンを押してチームを応援しよう！</p>
+  </header>
+
+  <div class="status" id="status" hidden>
+    <p id="status-text"></p>
+  </div>
+
+  <main id="teams"></main>
+
+  <footer>名前などの個人情報は記録しません。応援の回数だけが集計されます。</footer>
+
+  <script>
+    // ============================================================
+    //  設定（ここだけ変更すればOK）
+    // ============================================================
+    const CONFIG = {
+      // Googleフォームの送信先（…/viewform を …/formResponse に変えたURL）
+      FORM_RESPONSE_URL: 'https://docs.google.com/forms/d/e/1FAIpQLSfN2OPPqpxaCcAKUyiRZbkWYGCpQIFjBd6wFfBg04B-WVkxdw/formResponse',
+
+      // フォームの質問の ID（事前入力URLに含まれる entry.数字）
+      FORM_ENTRY_ID: 'entry.551747992',
+
+      // 合計を表示するための、total シートを「ウェブに公開」したCSVのURL
+      // ウェブに公開できない場合は '' のままにする（合計は表示せず、自分の応援回数だけ表示）
+      TOTALS_CSV_URL: '',
+
+      // クリックをまとめて送信する間隔（ミリ秒）。10000 推奨
+      SEND_INTERVAL_MS: 10000,
+
+      // 全チームの合計を取得する間隔（ミリ秒）
+      // ウェブに公開したシートは反映まで数分かかることがあるため、短くしすぎても意味がない
+      FETCH_INTERVAL_MS: 30000,
+
+      // 1秒あたりの最大クリック数（超えた分は無視）
+      MAX_CLICKS_PER_SECOND: 10,
+
+      // 1回の送信で1チームあたり送る最大回数（GAS側の上限と合わせる）
+      MAX_PER_TEAM_PER_REQUEST: 100,
+
+      // 合計を表示しないときに、合計の欄に出す文字
+      NO_TOTAL_LABEL: '合計は会場で発表します',
+
+      // チーム（id は GAS 側の TEAMS と一致させる）
+      TEAMS: [
+        { id: 'U1', name: 'U1', color: '#e63946' }, // 赤
+        { id: 'U2', name: 'U2', color: '#2a6fdb' }, // 青
+        { id: 'U3', name: 'U3', color: '#2a9d5c' }, // 緑
+      ],
+
+      // 押したときに浮かぶ絵文字
+      EMOJIS: ['📣', '🎉', '✨', '🔥'],
+    };
+    // ============================================================
+
+    // 端末に保存するキー（未送信の回数・自分の応援回数を保存し、再読み込みしても失わない）
+    const STORAGE_KEY = 'neolympic_cheer_v2';
+
+    const MSG_SEND_ERROR  = '通信が不安定です。応援は端末に保存され、あとで自動で送信されます。';
+    const MSG_FETCH_ERROR = '最新の合計を取得できませんでした。応援はそのまま続けられます。';
+    const MSG_NOT_SET     = 'フォームの設定がされていません（管理者向け：index.html の FORM_RESPONSE_URL と FORM_ENTRY_ID を設定してください）。';
+
+    // ---------- 状態 ----------
+    const state = {
+      pending: {},     // まだ送信していない回数 { U1: 3, ... }
+      inflight: null,  // 送信中（または再送待ち）のまとまり { id, counts }
+      mine: {},        // 自分の応援回数（この端末での累計）
+      displayed: {},   // 画面に表示している合計（減らないように管理する）
+    };
+    CONFIG.TEAMS.forEach(t => {
+      state.pending[t.id] = 0;
+      state.mine[t.id] = 0;
+      state.displayed[t.id] = 0;
+    });
+
+    const showTotals = !!CONFIG.TOTALS_CSV_URL;
+    const errors = { send: false, fetch: false };
+    const els = {};
+    let clickTimes = [];
+    let sending = false;
+    let fetching = false;
+
+    // ---------- 端末への保存・読み込み ----------
+    function toCount(v) {
+      const n = Number(v);
+      return Number.isInteger(n) && n > 0 ? n : 0;
+    }
+
+    function loadState() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (!raw) return;
+        const saved = JSON.parse(raw);
+        CONFIG.TEAMS.forEach(t => {
+          state.pending[t.id] = toCount(saved.pending && saved.pending[t.id]);
+          state.mine[t.id]    = toCount(saved.mine && saved.mine[t.id]);
+        });
+        if (saved.inflight && saved.inflight.id && saved.inflight.counts) {
+          state.inflight = saved.inflight;
+        }
+      } catch (e) {
+        // 保存できない環境（プライベートブラウズ等）でも動作は続ける
+      }
+    }
+
+    function saveState() {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify({
+          pending: state.pending,
+          inflight: state.inflight,
+          mine: state.mine,
+        }));
+      } catch (e) {
+        // 保存できなくても動作は続ける
+      }
+    }
+
+    // ---------- 画面 ----------
+    function buildCards() {
+      const main = document.getElementById('teams');
+
+      CONFIG.TEAMS.forEach(team => {
+        const card = document.createElement('section');
+        card.className = 'card';
+        card.style.setProperty('--team', team.color);
+        card.innerHTML = `
+          <h2 class="team-name">${team.name}</h2>
+          <p class="total-label">${showTotals ? 'チーム合計' : CONFIG.NO_TOTAL_LABEL}</p>
+          <p class="total" data-role="total"${showTotals ? '' : ' hidden'}>0</p>
+          <button type="button" class="cheer-btn" aria-label="${team.name}を応援する">📣 応援する！</button>
+          <p class="mine">あなたの応援：<strong data-role="mine">0</strong> 回</p>
+        `;
+
+        const btn = card.querySelector('.cheer-btn');
+        btn.addEventListener('click', () => onCheer(team.id, card, btn));
+
+        els[team.id] = {
+          total: card.querySelector('[data-role="total"]'),
+          mine:  card.querySelector('[data-role="mine"]'),
+        };
+        main.appendChild(card);
+      });
+    }
+
+    function render(teamId) {
+      els[teamId].total.textContent = state.displayed[teamId].toLocaleString('ja-JP');
+      els[teamId].mine.textContent  = state.mine[teamId].toLocaleString('ja-JP');
+    }
+
+    function renderAll() {
+      CONFIG.TEAMS.forEach(t => render(t.id));
+    }
+
+    function updateStatus() {
+      const box = document.getElementById('status');
+      const text = document.getElementById('status-text');
+      let msg = '';
+      if (!isConfigured()) msg = MSG_NOT_SET;
+      else if (errors.send) msg = MSG_SEND_ERROR;
+      else if (errors.fetch) msg = MSG_FETCH_ERROR;
+
+      text.textContent = msg;
+      box.hidden = !msg;
+    }
+
+    function spawnEmoji(card, btn) {
+      const span = document.createElement('span');
+      span.className = 'float-emoji';
+      span.textContent = CONFIG.EMOJIS[Math.floor(Math.random() * CONFIG.EMOJIS.length)];
+
+      const cardRect = card.getBoundingClientRect();
+      const btnRect = btn.getBoundingClientRect();
+      const x = btnRect.left - cardRect.left + btnRect.width / 2 + (Math.random() - 0.5) * btnRect.width * 0.6;
+      const y = btnRect.top - cardRect.top;
+      span.style.left = x + 'px';
+      span.style.top = y + 'px';
+
+      card.appendChild(span);
+      span.addEventListener('animationend', () => span.remove());
+      setTimeout(() => span.remove(), 1500); // 念のため
+    }
+
+    // ---------- 応援ボタン ----------
+    function onCheer(teamId, card, btn) {
+      // 連打対策：直近1秒のクリック数が上限に達していたら無視
+      const now = performance.now();
+      clickTimes = clickTimes.filter(t => now - t < 1000);
+      if (clickTimes.length >= CONFIG.MAX_CLICKS_PER_SECOND) return;
+      clickTimes.push(now);
+
+      state.pending[teamId]++;
+      state.mine[teamId]++;
+      state.displayed[teamId]++; // 押した瞬間に合計も増やす
+      saveState();
+      render(teamId);
+      spawnEmoji(card, btn);
+    }
+
+    // ---------- 通信 ----------
+    function isConfigured() {
+      return /\/formResponse(\?|$)/.test(CONFIG.FORM_RESPONSE_URL) &&
+             /^entry\.\d+$/.test(CONFIG.FORM_ENTRY_ID) &&
+             CONFIG.FORM_ENTRY_ID !== 'entry.0000000000';
+    }
+
+    function makeId() {
+      if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
+      return Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 12);
+    }
+
+    // 未送信の回数から、次に送るまとまりを作る（1チームあたり上限まで。残りは次回）
+    function prepareInflight() {
+      if (state.inflight) return;
+
+      const counts = {};
+      let sum = 0;
+      CONFIG.TEAMS.forEach(t => {
+        const n = Math.min(state.pending[t.id], CONFIG.MAX_PER_TEAM_PER_REQUEST);
+        if (n > 0) {
+          counts[t.id] = n;
+          state.pending[t.id] -= n;
+          sum += n;
+        }
+      });
+
+      if (sum > 0) {
+        state.inflight = { id: makeId(), counts };
+        saveState();
+      }
+    }
+
+    // フォームに送る本文（entry.数字 = 回答の中身）
+    function buildFormBody() {
+      const params = new URLSearchParams();
+      params.append(CONFIG.FORM_ENTRY_ID, JSON.stringify(state.inflight));
+      return params;
+    }
+
+    // まとめて送信
+    // mode: 'no-cors' にする理由：Googleフォームはほかのサイトからの送信結果を読ませないため。
+    // 送信自体は届くが、結果（成功・失敗）はページから確認できない。
+    // そのため「通信が成功したら送信できた」とみなす。通信自体が失敗したら同じ送信IDで再送し、
+    // 二重に届いてもGAS側で重複は加算しない。
+    async function sendCheers() {
+      if (sending || !isConfigured()) return;
+
+      prepareInflight();
+      if (!state.inflight) return;
+
+      sending = true;
+      try {
+        await fetch(CONFIG.FORM_RESPONSE_URL, {
+          method: 'POST',
+          mode: 'no-cors',
+          body: buildFormBody(),
+        });
+        state.inflight = null;
+        saveState();
+        errors.send = false;
+      } catch (e) {
+        errors.send = true; // 通信できなかった → 次回再送
+      } finally {
+        sending = false;
+        updateStatus();
+      }
+    }
+
+    // 合計の取得（total シートを「ウェブに公開」したCSVを読む）
+    async function fetchTotals() {
+      if (!showTotals || fetching || document.hidden) return;
+
+      fetching = true;
+      try {
+        const sep = CONFIG.TOTALS_CSV_URL.includes('?') ? '&' : '?';
+        const res = await fetch(CONFIG.TOTALS_CSV_URL + sep + 't=' + Date.now());
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        const totals = parseTotalsCsv(await res.text());
+
+        CONFIG.TEAMS.forEach(t => {
+          if (!(t.id in totals)) return;
+          // 公開シートの反映は遅れるため、まだ反映されていない自分の分で表示が減らないよう、
+          // 「今の表示」と「公開シートの合計＋未送信分」の大きい方を表示する
+          const unsent = state.pending[t.id] + (state.inflight && state.inflight.counts[t.id] ? state.inflight.counts[t.id] : 0);
+          state.displayed[t.id] = Math.max(state.displayed[t.id], totals[t.id] + unsent);
+        });
+        renderAll();
+        errors.fetch = false;
+      } catch (e) {
+        errors.fetch = true;
+      } finally {
+        fetching = false;
+        updateStatus();
+      }
+    }
+
+    // CSV（チーム,合計）を { U1: 123, ... } にする
+    function parseTotalsCsv(text) {
+      const totals = {};
+      text.split(/\r?\n/).forEach(line => {
+        const [team, sum] = line.split(',').map(s => s.replace(/"/g, '').trim());
+        const n = Number(sum);
+        if (team && Number.isFinite(n)) totals[team] = n;
+      });
+      return totals;
+    }
+
+    // 画面を閉じる・切り替えるときに、未送信分を送っておく
+    // （届いたか確認できないので送信中のまとまりは消さない。次回同じIDで再送し、GAS側で重複は無視される）
+    function flushWithBeacon() {
+      if (!isConfigured() || !navigator.sendBeacon) return;
+      prepareInflight();
+      if (!state.inflight) return;
+      navigator.sendBeacon(CONFIG.FORM_RESPONSE_URL, buildFormBody());
+    }
+
+    // ---------- 起動 ----------
+    loadState();
+    buildCards();
+    renderAll();
+    updateStatus();
+
+    fetchTotals();
+    sendCheers(); // 前回送れなかった分があれば送る
+
+    setInterval(sendCheers, CONFIG.SEND_INTERVAL_MS);
+    setInterval(fetchTotals, CONFIG.FETCH_INTERVAL_MS);
+
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) flushWithBeacon();
+      else fetchTotals();
+    });
+    window.addEventListener('pagehide', flushWithBeacon);
+  </script>
+</body>
+</html>
