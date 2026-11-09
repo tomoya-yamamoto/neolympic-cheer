@@ -5,68 +5,25 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>NeOlympic 応援サイト</title>
   <style>
-    /* ===== 全体の色（チームカラーは下の CONFIG.TEAMS で変更） ===== */
     :root {
-      --bg: #f4f5f7;      /* 背景 */
-      --card: #ffffff;    /* カード */
-      --text: #1d1f23;    /* 文字 */
-      --sub: #6b7280;     /* 補足の文字 */
+      --bg: #f4f5f7;
+      --card: #ffffff;
+      --text: #1d1f23;
+      --sub: #6b7280;
+      --team: #9ca3af;
     }
-
     * { box-sizing: border-box; }
-
     body {
       margin: 0;
       font-family: system-ui, -apple-system, "Hiragino Sans", "Noto Sans JP", sans-serif;
       background: var(--bg);
       color: var(--text);
     }
-
-    header {
-      text-align: center;
-      padding: 24px 16px 8px;
-    }
-
-    h1 {
-      margin: 0;
-      font-size: 1.6rem;
-      letter-spacing: 0.04em;
-    }
-
-    .lead {
-      margin: 8px 0 0;
-      color: var(--sub);
-      font-size: 0.9rem;
-    }
-
-    /* 通信エラーなどの控えめなお知らせ */
-    .status {
-      max-width: 1080px;
-      margin: 8px auto 0;
-      padding: 0 16px;
-    }
-    .status[hidden] { display: none; }
-    .status p {
-      margin: 0;
-      padding: 8px 16px;
-      border-radius: 8px;
-      background: #fff4e5;
-      color: #8a5300;
-      font-size: 0.85rem;
-    }
-
-    /* スマホは1列、広い画面は3列 */
-    main {
-      display: grid;
-      grid-template-columns: 1fr;
-      gap: 16px;
-      max-width: 1080px;
-      margin: 0 auto;
-      padding: 16px;
-    }
-    @media (min-width: 720px) {
-      main { grid-template-columns: repeat(3, 1fr); }
-    }
+    header { text-align: center; padding: 24px 16px 8px; }
+    h1 { margin: 0; font-size: 1.5rem; letter-spacing: 0.04em; }
+    .lead { margin: 8px 0 0; color: var(--sub); font-size: 0.9rem; }
+    main { max-width: 520px; margin: 0 auto; padding: 16px; }
+    [hidden] { display: none !important; }
 
     .card {
       position: relative;
@@ -75,85 +32,124 @@
       border-top: 8px solid var(--team);
       padding: 24px 16px;
       box-shadow: 0 2px 10px rgba(0, 0, 0, 0.06);
-      text-align: center;
     }
 
-    .team-name {
-      margin: 0;
-      font-size: 1.3rem;
-      font-weight: 700;
-      color: var(--team);
+    /* ===== 入室画面 ===== */
+    .field { margin-bottom: 20px; }
+    .field label { display: block; font-weight: 700; margin-bottom: 8px; }
+    .field input {
+      width: 100%; padding: 12px; font-size: 1.1rem;
+      border: 2px solid #d1d5db; border-radius: 10px;
     }
-
-    .notice {
-      margin: 16px 0;
-      font-size: 0.8rem;
-      color: var(--sub);
+    .hint { margin: 6px 0 0; font-size: 0.8rem; color: var(--sub); }
+    .err  { margin: 6px 0 0; font-size: 0.85rem; color: #b91c1c; min-height: 1em; }
+    .team-choices { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+    .team-choice {
+      padding: 14px 0; border-radius: 12px; border: 3px solid var(--c);
+      background: #fff; color: var(--c); font-size: 1.2rem; font-weight: 800; cursor: pointer;
     }
+    .team-choice[aria-pressed="true"] { background: var(--c); color: #fff; }
+    .fixed-team { font-size: 1.3rem; font-weight: 800; color: var(--team); }
+    .enter-btn {
+      display: block; width: 100%; padding: 16px; border: none; border-radius: 999px;
+      background: #1d1f23; color: #fff; font-size: 1.15rem; font-weight: 700; cursor: pointer;
+    }
+    .enter-btn:disabled { opacity: 0.35; cursor: default; }
 
+    /* ===== 応援画面 ===== */
+    .cheer { text-align: center; }
+    .team-name { margin: 0; font-size: 1.6rem; font-weight: 800; color: var(--team); }
+    .me { margin: 8px 0 0; color: var(--sub); font-size: 0.9rem; }
+    .me strong { color: var(--text); font-size: 1.05rem; }
+    .total-label { margin: 16px 0 0; font-size: 0.8rem; color: var(--sub); }
+    .total { margin: 0; font-size: 2.4rem; font-weight: 800; font-variant-numeric: tabular-nums; }
     .cheer-btn {
-      display: block;
-      width: 100%;
-      padding: 16px;
-      border: none;
-      border-radius: 999px;
-      background: var(--team);
-      color: #fff;
-      font-size: 1.2rem;
-      font-weight: 700;
-      cursor: pointer;
-      /* スマホで連打したときにダブルタップズームや文字選択が起きないようにする */
-      touch-action: manipulation;
-      user-select: none;
-      -webkit-user-select: none;
-      -webkit-tap-highlight-color: transparent;
-      transition: transform 0.06s;
+      display: block; width: 100%; margin-top: 20px; padding: 28px 16px;
+      border: none; border-radius: 999px; background: var(--team); color: #fff;
+      font-size: 1.5rem; font-weight: 800; cursor: pointer;
+      touch-action: manipulation; user-select: none; -webkit-user-select: none;
+      -webkit-tap-highlight-color: transparent; transition: transform 0.06s;
     }
     .cheer-btn:active { transform: scale(0.96); }
+    .mine { margin: 16px 0 0; font-size: 0.95rem; color: var(--sub); }
+    .mine strong { color: var(--text); font-size: 1.3rem; }
+    .links { margin-top: 16px; font-size: 0.8rem; }
+    .links button { background: none; border: none; color: var(--sub); text-decoration: underline; cursor: pointer; }
 
-    .mine {
-      margin: 16px 0 0;
-      font-size: 0.9rem;
-      color: var(--sub);
-    }
-    .mine strong { color: var(--text); }
-
-    /* 押したときに浮かぶ絵文字 */
     .float-emoji {
-      position: absolute;
-      pointer-events: none;
-      font-size: 1.8rem;
+      position: absolute; pointer-events: none; font-size: 1.8rem;
       animation: floatUp 1s ease-out forwards;
     }
     @keyframes floatUp {
       from { opacity: 1; transform: translate(-50%, 0) scale(1); }
       to   { opacity: 0; transform: translate(-50%, -120px) scale(1.4); }
     }
-    @media (prefers-reduced-motion: reduce) {
-      .float-emoji { animation-duration: 0.4s; }
-    }
+    @media (prefers-reduced-motion: reduce) { .float-emoji { animation-duration: 0.4s; } }
 
-    footer {
-      text-align: center;
-      color: var(--sub);
-      font-size: 0.75rem;
-      padding: 8px 16px 24px;
+    .status { margin: 0 0 12px; }
+    .status p {
+      margin: 0; padding: 8px 16px; border-radius: 8px;
+      background: #fff4e5; color: #8a5300; font-size: 0.85rem;
     }
+    .notice {
+      margin-top: 16px; padding: 10px 12px; border-radius: 10px;
+      background: #eef2ff; color: #3730a3; font-size: 0.8rem; text-align: left; line-height: 1.6;
+    }
+    footer { text-align: center; color: var(--sub); font-size: 0.75rem; padding: 8px 16px 24px; }
   </style>
 </head>
 <body>
   <header>
     <h1>NeOlympic 応援サイト</h1>
-    <p class="lead">ボタンを押してチームを応援しよう！</p>
+    <p class="lead" id="lead">ニックネームとチームを選んで入室しよう！</p>
   </header>
 
-  <div class="status" id="status" hidden>
-    <p id="status-text"></p>
-  </div>
+  <main>
+    <div class="status" id="status" hidden><p id="status-text"></p></div>
 
-  <main id="teams"></main>
+    <!-- ===== 入室画面 ===== -->
+    <section class="card" id="entry">
+      <div class="field">
+        <label for="name">ニックネーム（12文字まで）</label>
+        <input id="name" type="text" maxlength="12" autocomplete="off" placeholder="例：たろう">
+        <p class="hint">ランキングでは「たろう#K7M2X」のように、自動でつくIDと一緒に表示されます。</p>
+        <p class="err" id="name-err"></p>
+      </div>
 
-  <footer>名前などの個人情報は記録しません。応援の回数だけが集計されます。</footer>
+      <div class="field" id="team-field">
+        <label>入室するチーム</label>
+        <div class="team-choices" id="team-choices"></div>
+      </div>
+      <div class="field" id="team-fixed" hidden>
+        <label>入室するチーム</label>
+        <div class="fixed-team" id="team-fixed-name"></div>
+      </div>
+
+      <button type="button" class="enter-btn" id="enter" disabled>入室する</button>
+
+      <div class="notice">
+        ・応援は <b>1台の端末・ふだん使うブラウザ</b> でしてね。<br>
+        ・このページを<b>ブックマーク</b>しておくと、次回もそのまま応援画面が開きます。<br>
+        ・別の端末やシークレットモードで開くと、別の人として数えられます。
+      </div>
+    </section>
+
+    <!-- ===== 応援画面 ===== -->
+    <section class="card cheer" id="cheer" hidden>
+      <h2 class="team-name" id="cheer-team"></h2>
+      <p class="me">あなたの表示名：<strong id="display-name"></strong></p>
+
+      <p class="total-label" id="total-label"></p>
+      <p class="total" id="total" hidden>0</p>
+
+      <button type="button" class="cheer-btn" id="cheer-btn">📣 応援する！</button>
+      <p class="mine">今回の応援：<strong id="mine">0</strong> 回</p>
+
+      <div class="links"><button type="button" id="rename">ニックネームを直す</button></div>
+    </section>
+  </main>
+
+  <footer>ニックネーム・自動でつくID・チーム・応援回数が記録されます。</footer>
 
   <script>
     // ============================================================
@@ -166,273 +162,330 @@
       // フォームの質問の ID（事前入力URLに含まれる entry.数字）
       FORM_ENTRY_ID: 'entry.551747992',
 
-      // 回（ラウンド）の番号。上げると、全員の端末の「あなたの応援」が0に戻る
-      // ※ チームの合計（スプレッドシート側）は戻らない。合計のリセットは GAS の resetForTest で行う
-      // ※ 上げた時点で、各端末の未送信の応援は破棄されるので、イベント開始前に行うこと
-      // ※ 送信データにも round が入るが、集計側（GAS）では使っていない
-      ROUND: 1,
+      // チーム合計をウェブに公開したCSVのURL（使わない・公開できない場合は '' のまま）
+      TOTALS_CSV_URL: '',
 
-      // クリックをまとめて送信する間隔（ミリ秒）。10000 推奨
-      SEND_INTERVAL_MS: 10000,
+      SEND_INTERVAL_MS: 10000,        // 応援をまとめて送る間隔（ミリ秒）
+      FETCH_INTERVAL_MS: 30000,       // 合計を取りに行く間隔（ミリ秒）
+      MAX_CLICKS_PER_SECOND: 10,      // 1秒に数える最大回数（超えた分は無視）
+      MAX_PER_REQUEST: 100,           // 1回の送信で送る最大回数（集計シートの上限と合わせる）
+      NAME_MAX: 12,                   // ニックネームの最大文字数
+      NO_TOTAL_LABEL: '合計は会場で発表します',
 
-      // 1秒あたりの最大クリック数（超えた分は無視）
-      MAX_CLICKS_PER_SECOND: 10,
-
-      // 1回の送信で1チームあたり送る最大回数（GAS側の上限と合わせる）
-      MAX_PER_TEAM_PER_REQUEST: 100,
-
-      // カードに表示するお知らせ（合計はこのサイトには出さず、会場で発表する）
-      TOTAL_NOTICE: '合計は会場で発表します',
-
-      // チーム（id は GAS の TEAMS・total シートのチーム名と一致させる）
       TEAMS: [
         { id: 'U1', name: 'U1', color: '#e63946' }, // 赤
         { id: 'U2', name: 'U2', color: '#2a9d5c' }, // 緑
         { id: 'U3', name: 'U3', color: '#2a6fdb' }, // 青
       ],
 
-      // 押したときに浮かぶ絵文字
       EMOJIS: ['📣', '🎉', '✨', '🔥'],
     };
     // ============================================================
 
-    // 端末に保存するキー（未送信の回数・自分の応援回数を保存し、再読み込みしても失わない）
-    const STORAGE_KEY = 'neolympic_cheer_v2';
+    // 端末に保存するキー
+    const PROFILE_KEY = 'neolympic_profile_v3';   // { pid, name, team }
+    const QUEUE_KEY   = 'neolympic_queue_v3';     // { pending, inflight }
+    // IDに使う文字（0とO、1とI のような紛らわしい文字は除く）
+    const ID_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 
-    const MSG_SEND_ERROR = '通信が不安定です。応援は端末に保存され、あとで自動で送信されます。';
-    const MSG_NOT_SET    = 'フォームの設定がされていません（管理者向け：index.html の FORM_RESPONSE_URL と FORM_ENTRY_ID を設定してください）。';
+    const MSG_SEND_ERROR  = '通信が不安定です。応援は端末に保存され、あとで自動で送信されます。';
+    const MSG_FETCH_ERROR = '最新の合計を取得できませんでした。応援はそのまま続けられます。';
+    const MSG_NOT_SET     = 'フォームの設定がされていません（管理者向け：FORM_RESPONSE_URL と FORM_ENTRY_ID を設定してください）。';
 
-    // ---------- 状態 ----------
-    const state = {
-      round: CONFIG.ROUND, // 今の回の番号
-      pending: {},         // まだ送信していない回数 { U1: 3, ... }
-      inflight: null,      // 送信中（または再送待ち）のまとまり { id, round, counts }
-      mine: {},            // 自分の応援回数（この端末での、今の回の累計）
-    };
-    CONFIG.TEAMS.forEach(t => {
-      state.pending[t.id] = 0;
-      state.mine[t.id] = 0;
-    });
+    const $ = id => document.getElementById(id);
+    const teamById = id => CONFIG.TEAMS.find(t => t.id === id);
+    const showTotals = !!CONFIG.TOTALS_CSV_URL;
 
-    const errors = { send: false };
-    const els = {};
+    let profile = null;                 // { pid, name, team }
+    let queue = { pending: 0, inflight: null };
+    let sessionCount = 0;               // このページを開いてからの応援回数
+    let displayedTotal = 0;
+    let selectedTeam = null;
+    let fixedTeam = null;               // URLの ?team=U1 で決まったチーム
     let clickTimes = [];
-    let sending = false;
+    let sending = false, fetching = false;
+    const errors = { send: false, fetch: false };
 
-    // ---------- 端末への保存・読み込み ----------
-    function toCount(v) {
-      const n = Number(v);
-      return Number.isInteger(n) && n > 0 ? n : 0;
+    // ---------- 保存・読み込み ----------
+    function readJSON(key) {
+      try { return JSON.parse(localStorage.getItem(key)); } catch (e) { return null; }
+    }
+    function writeJSON(key, value) {
+      try { localStorage.setItem(key, JSON.stringify(value)); } catch (e) { /* 保存できなくても続ける */ }
+    }
+    function toCount(v) { const n = Number(v); return Number.isInteger(n) && n > 0 ? n : 0; }
+
+    function makePid() {
+      const buf = new Uint32Array(5);
+      crypto.getRandomValues(buf);
+      return Array.from(buf, n => ID_CHARS[n % ID_CHARS.length]).join('');
     }
 
-    function loadState() {
-      try {
-        // テスト用：URLの最後に ?reset=1 を付けて開くと、この端末の記録だけ消す
-        const params = new URLSearchParams(location.search);
-        if (params.get('reset') === '1') {
-          localStorage.removeItem(STORAGE_KEY);
-          params.delete('reset');
-          const q = params.toString();
-          history.replaceState(null, '', location.pathname + (q ? '?' + q : '') + location.hash);
-          return;
-        }
+    function loadAll() {
+      const params = new URLSearchParams(location.search);
 
-        const raw = localStorage.getItem(STORAGE_KEY);
-        if (!raw) return;
-        const saved = JSON.parse(raw);
+      // ?reset=1 で、この端末の記録を消して最初から（新しいIDになる）
+      if (params.get('reset') === '1') {
+        try { localStorage.removeItem(PROFILE_KEY); localStorage.removeItem(QUEUE_KEY); } catch (e) {}
+        params.delete('reset');
+      }
 
-        // 回の番号が変わっていたら、前の回の記録は使わない（＝0から）
-        if (saved.round !== CONFIG.ROUND) return;
+      // ?team=U1 のような専用リンクなら、チームを固定
+      const t = params.get('team');
+      if (t && teamById(t.toUpperCase())) {
+        fixedTeam = t.toUpperCase();
+        params.delete('team');
+      }
+      const q = params.toString();
+      history.replaceState(null, '', location.pathname + (q ? '?' + q : '') + location.hash);
 
-        CONFIG.TEAMS.forEach(t => {
-          state.pending[t.id] = toCount(saved.pending && saved.pending[t.id]);
-          state.mine[t.id]    = toCount(saved.mine && saved.mine[t.id]);
-        });
-        if (saved.inflight && saved.inflight.id && saved.inflight.counts) {
-          state.inflight = saved.inflight;
-        }
-      } catch (e) {
-        // 保存できない環境（プライベートブラウズ等）でも動作は続ける
+      const p = readJSON(PROFILE_KEY);
+      if (p && /^[A-Z0-9]{5}$/.test(p.pid) && p.name && teamById(p.team)) profile = p;
+
+      const qd = readJSON(QUEUE_KEY);
+      if (qd) {
+        queue.pending = toCount(qd.pending);
+        if (qd.inflight && qd.inflight.bid && toCount(qd.inflight.count)) queue.inflight = qd.inflight;
       }
     }
+    const saveProfile = () => writeJSON(PROFILE_KEY, profile);
+    const saveQueue = () => writeJSON(QUEUE_KEY, queue);
 
-    function saveState() {
-      try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify({
-          round: state.round,
-          pending: state.pending,
-          inflight: state.inflight,
-          mine: state.mine,
-        }));
-      } catch (e) {
-        // 保存できなくても動作は続ける
-      }
+    // ---------- ニックネームのチェック ----------
+    // ・前後の空白を消し、全角英数を半角にそろえる
+    // ・" と \ は使えない（集計で読み取るため）
+    // ・= + - @ で始まる名前は使えない（シートで数式として扱われるのを防ぐ）
+    function cleanName(raw) {
+      return raw.normalize('NFKC').replace(/\s+/g, ' ').trim();
+    }
+    function nameError(name) {
+      if (!name) return 'ニックネームを入れてね';
+      if ([...name].length > CONFIG.NAME_MAX) return `${CONFIG.NAME_MAX}文字までにしてね`;
+      if (/["\\]/.test(name)) return '" と \\ は使えません';
+      if (/^[=+\-@]/.test(name)) return '= + - @ で始まる名前は使えません';
+      return '';
     }
 
-    // ---------- 画面 ----------
-    function buildCards() {
-      const main = document.getElementById('teams');
-
+    // ---------- 入室画面 ----------
+    function buildEntry() {
+      const box = $('team-choices');
       CONFIG.TEAMS.forEach(team => {
-        const card = document.createElement('section');
-        card.className = 'card';
-        card.style.setProperty('--team', team.color);
-        card.innerHTML = `
-          <h2 class="team-name">${team.name}</h2>
-          <p class="notice">${CONFIG.TOTAL_NOTICE}</p>
-          <button type="button" class="cheer-btn" aria-label="${team.name}を応援する">応援する！</button>
-          <p class="mine">あなたの応援：<strong data-role="mine">0</strong> 回</p>
-        `;
-
-        const btn = card.querySelector('.cheer-btn');
-        btn.addEventListener('click', () => onCheer(team.id, card, btn));
-
-        els[team.id] = { mine: card.querySelector('[data-role="mine"]') };
-        main.appendChild(card);
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'team-choice';
+        b.textContent = team.name;
+        b.dataset.team = team.id;
+        b.style.setProperty('--c', team.color);
+        b.addEventListener('click', () => { selectedTeam = team.id; refreshEntry(); });
+        box.appendChild(b);
       });
+      $('name').addEventListener('input', refreshEntry);
+      $('enter').addEventListener('click', enterRoom);
     }
 
-    function render(teamId) {
-      els[teamId].mine.textContent = state.mine[teamId].toLocaleString('ja-JP');
+    function openEntry(renameOnly) {
+      $('cheer').hidden = true;
+      $('entry').hidden = false;
+      $('lead').textContent = renameOnly ? 'ニックネームを直せます（チームは変わりません）'
+                                         : 'ニックネームとチームを選んで入室しよう！';
+      $('name').value = profile ? profile.name : '';
+
+      // チームが決まっている（2回目以降・専用リンク）なら選択肢を出さない
+      const lockTeam = (profile && profile.team) || fixedTeam;
+      selectedTeam = lockTeam || null;
+      $('team-field').hidden = !!lockTeam;
+      $('team-fixed').hidden = !lockTeam;
+      if (lockTeam) {
+        const t = teamById(lockTeam);
+        $('team-fixed-name').textContent = t.name;
+        document.documentElement.style.setProperty('--team', t.color);
+      }
+      refreshEntry();
     }
 
-    function renderAll() {
-      CONFIG.TEAMS.forEach(t => render(t.id));
+    function refreshEntry() {
+      const name = cleanName($('name').value);
+      const err = $('name').value ? nameError(name) : '';
+      $('name-err').textContent = err;
+      document.querySelectorAll('.team-choice').forEach(b => {
+        b.setAttribute('aria-pressed', String(b.dataset.team === selectedTeam));
+      });
+      $('enter').disabled = !!nameError(name) || !selectedTeam;
     }
 
-    function updateStatus() {
-      const box = document.getElementById('status');
-      const text = document.getElementById('status-text');
-      let msg = '';
-      if (!isConfigured()) msg = MSG_NOT_SET;
-      else if (errors.send) msg = MSG_SEND_ERROR;
-
-      text.textContent = msg;
-      box.hidden = !msg;
+    function enterRoom() {
+      const name = cleanName($('name').value);
+      if (nameError(name) || !selectedTeam) return;
+      profile = {
+        pid: profile ? profile.pid : makePid(),     // IDは最初の1回だけ作る
+        name,
+        team: profile ? profile.team : selectedTeam, // チームはあとから変えない
+      };
+      saveProfile();
+      openCheer();
     }
 
-    function spawnEmoji(card, btn) {
+    // ---------- 応援画面 ----------
+    function openCheer() {
+      const team = teamById(profile.team);
+      document.documentElement.style.setProperty('--team', team.color);
+      $('entry').hidden = true;
+      $('cheer').hidden = false;
+      $('lead').textContent = 'ボタンを押してチームを応援しよう！';
+      $('cheer-team').textContent = `${team.name} を応援中`;
+      $('display-name').textContent = `${profile.name}#${profile.pid}`;
+      $('total-label').textContent = showTotals ? 'チーム合計' : CONFIG.NO_TOTAL_LABEL;
+      $('total').hidden = !showTotals;
+      render();
+      fetchTotals();
+    }
+
+    function render() {
+      $('mine').textContent = sessionCount.toLocaleString('ja-JP');
+      $('total').textContent = displayedTotal.toLocaleString('ja-JP');
+    }
+
+    function spawnEmoji() {
+      const card = $('cheer'), btn = $('cheer-btn');
       const span = document.createElement('span');
       span.className = 'float-emoji';
       span.textContent = CONFIG.EMOJIS[Math.floor(Math.random() * CONFIG.EMOJIS.length)];
-
-      const cardRect = card.getBoundingClientRect();
-      const btnRect = btn.getBoundingClientRect();
-      const x = btnRect.left - cardRect.left + btnRect.width / 2 + (Math.random() - 0.5) * btnRect.width * 0.6;
-      const y = btnRect.top - cardRect.top;
-      span.style.left = x + 'px';
-      span.style.top = y + 'px';
-
+      const c = card.getBoundingClientRect(), b = btn.getBoundingClientRect();
+      span.style.left = (b.left - c.left + b.width / 2 + (Math.random() - 0.5) * b.width * 0.6) + 'px';
+      span.style.top  = (b.top - c.top) + 'px';
       card.appendChild(span);
       span.addEventListener('animationend', () => span.remove());
-      setTimeout(() => span.remove(), 1500); // 念のため
+      setTimeout(() => span.remove(), 1500);
     }
 
-    // ---------- 応援ボタン ----------
-    function onCheer(teamId, card, btn) {
-      // 連打対策：直近1秒のクリック数が上限に達していたら無視
+    function onCheer() {
+      if (!profile) return;
       const now = performance.now();
       clickTimes = clickTimes.filter(t => now - t < 1000);
       if (clickTimes.length >= CONFIG.MAX_CLICKS_PER_SECOND) return;
       clickTimes.push(now);
 
-      state.pending[teamId]++;
-      state.mine[teamId]++;
-      saveState();
-      render(teamId);
-      spawnEmoji(card, btn);
+      queue.pending++;
+      sessionCount++;
+      displayedTotal++;
+      saveQueue();
+      render();
+      spawnEmoji();
     }
 
-    // ---------- 通信 ----------
+    function updateStatus() {
+      let msg = '';
+      if (!isConfigured()) msg = MSG_NOT_SET;
+      else if (errors.send) msg = MSG_SEND_ERROR;
+      else if (errors.fetch) msg = MSG_FETCH_ERROR;
+      $('status-text').textContent = msg;
+      $('status').hidden = !msg;
+    }
+
+    // ---------- 送信 ----------
     function isConfigured() {
       return /\/formResponse(\?|$)/.test(CONFIG.FORM_RESPONSE_URL) &&
-             /^entry\.\d+$/.test(CONFIG.FORM_ENTRY_ID) &&
-             CONFIG.FORM_ENTRY_ID !== 'entry.0000000000';
+             /^entry\.\d+$/.test(CONFIG.FORM_ENTRY_ID);
     }
 
-    function makeId() {
+    function makeBid() {
       if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
       return Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 12);
     }
 
-    // 未送信の回数から、次に送るまとまりを作る（1チームあたり上限まで。残りは次回）
+    // 未送信の回数から、次に送るまとまりを作る（上限まで。残りは次回）
     function prepareInflight() {
-      if (state.inflight) return;
-
-      const counts = {};
-      let sum = 0;
-      CONFIG.TEAMS.forEach(t => {
-        const n = Math.min(state.pending[t.id], CONFIG.MAX_PER_TEAM_PER_REQUEST);
-        if (n > 0) {
-          counts[t.id] = n;
-          state.pending[t.id] -= n;
-          sum += n;
-        }
-      });
-
-      if (sum > 0) {
-        state.inflight = { id: makeId(), round: state.round, counts };
-        saveState();
-      }
+      if (queue.inflight || !profile) return;
+      const n = Math.min(queue.pending, CONFIG.MAX_PER_REQUEST);
+      if (n <= 0) return;
+      queue.pending -= n;
+      queue.inflight = {
+        v: 3,                  // データの形式（集計シートはこの番号の回答だけ数える）
+        bid: makeBid(),        // 送信ごとのID（再送で二重に届いても1回分として数える）
+        pid: profile.pid,
+        name: profile.name,
+        team: profile.team,
+        count: n,
+      };
+      saveQueue();
     }
 
-    // フォームに送る本文（entry.数字 = 回答の中身）
     function buildFormBody() {
       const params = new URLSearchParams();
-      params.append(CONFIG.FORM_ENTRY_ID, JSON.stringify(state.inflight));
+      params.append(CONFIG.FORM_ENTRY_ID, JSON.stringify(queue.inflight));
       return params;
     }
 
-    // まとめて送信
-    // mode: 'no-cors' にする理由：Googleフォームはほかのサイトからの送信結果を読ませないため。
-    // 送信自体は届くが、結果（成功・失敗）はページから確認できない。
-    // そのため「通信が成功したら送信できた」とみなす。通信自体が失敗したら同じ送信IDで再送し、
-    // 二重に届いても GAS 側が送信IDを見て、重複は加算しない。
-    // ※ フォームを「ログイン必須」「1回のみ回答」にすると、断られても成功扱いになり応援が消えるので注意
+    // mode: 'no-cors' … Googleフォームは送信結果を読ませないため、届いたかはページから確認できない。
+    // 通信が通ったら送れたとみなす。失敗したら同じ内容（同じ bid）で再送し、集計シート側で重複を除く。
     async function sendCheers() {
       if (sending || !isConfigured()) return;
-
       prepareInflight();
-      if (!state.inflight) return;
+      if (!queue.inflight) return;
 
       sending = true;
       try {
-        await fetch(CONFIG.FORM_RESPONSE_URL, {
-          method: 'POST',
-          mode: 'no-cors',
-          body: buildFormBody(),
-        });
-        state.inflight = null;
-        saveState();
+        await fetch(CONFIG.FORM_RESPONSE_URL, { method: 'POST', mode: 'no-cors', body: buildFormBody() });
+        queue.inflight = null;
+        saveQueue();
         errors.send = false;
       } catch (e) {
-        errors.send = true; // 通信できなかった → 次回再送
+        errors.send = true;
       } finally {
         sending = false;
         updateStatus();
       }
     }
 
-    // 画面を閉じる・切り替えるときに、未送信分を送っておく
-    // （届いたか確認できないので送信中のまとまりは消さない。次回同じIDで再送し、GAS側で重複は無視される）
     function flushWithBeacon() {
       if (!isConfigured() || !navigator.sendBeacon) return;
       prepareInflight();
-      if (!state.inflight) return;
+      if (!queue.inflight) return;
       navigator.sendBeacon(CONFIG.FORM_RESPONSE_URL, buildFormBody());
     }
 
+    // ---------- 合計の取得（任意） ----------
+    async function fetchTotals() {
+      if (!showTotals || !profile || fetching || document.hidden) return;
+      fetching = true;
+      try {
+        const sep = CONFIG.TOTALS_CSV_URL.includes('?') ? '&' : '?';
+        const res = await fetch(CONFIG.TOTALS_CSV_URL + sep + 't=' + Date.now());
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        const totals = {};
+        (await res.text()).split(/\r?\n/).forEach(line => {
+          const [team, sum] = line.split(',').map(s => s.replace(/"/g, '').trim());
+          const n = Number(sum);
+          if (team && Number.isFinite(n)) totals[team] = n;
+        });
+        if (profile.team in totals) {
+          const unsent = queue.pending + (queue.inflight ? queue.inflight.count : 0);
+          displayedTotal = Math.max(displayedTotal, totals[profile.team] + unsent);
+          render();
+        }
+        errors.fetch = false;
+      } catch (e) {
+        errors.fetch = true;
+      } finally {
+        fetching = false;
+        updateStatus();
+      }
+    }
+
     // ---------- 起動 ----------
-    loadState();
-    buildCards();
-    renderAll();
+    loadAll();
+    buildEntry();
+    $('cheer-btn').addEventListener('click', onCheer);
+    $('rename').addEventListener('click', () => openEntry(true));
+
+    if (profile) openCheer(); else openEntry(false);
     updateStatus();
 
-    sendCheers(); // 前回送れなかった分があれば送る
+    sendCheers();   // 前回送れなかった分があれば送る
     setInterval(sendCheers, CONFIG.SEND_INTERVAL_MS);
-
+    setInterval(fetchTotals, CONFIG.FETCH_INTERVAL_MS);
     document.addEventListener('visibilitychange', () => {
-      if (document.hidden) flushWithBeacon();
+      if (document.hidden) flushWithBeacon(); else fetchTotals();
     });
     window.addEventListener('pagehide', flushWithBeacon);
   </script>
