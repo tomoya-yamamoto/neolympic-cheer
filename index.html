@@ -173,6 +173,11 @@
       // フォームの質問の ID（事前入力URLに含まれる entry.数字）
       FORM_ENTRY_ID: 'entry.551747992',
 
+      // 回（ラウンド）の番号。リセットしたいときは数字を1つ上げる（1 → 2 → 3 …）
+      // 上げると、全員の「あなたの応援」が0に戻り、合計も新しい回の分だけ数え直しになる
+      // ※ TOTALS_CSV_URL のCSVに「ROUND,数字」の行がある場合は、そちらの数字が優先される
+      ROUND: 1,
+
       // 合計を表示するための、total シートを「ウェブに公開」したCSVのURL
       // ウェブに公開できない場合は '' のままにする（合計は表示せず、自分の応援回数だけ表示）
       TOTALS_CSV_URL: '',
@@ -214,16 +219,22 @@
 
     // ---------- 状態 ----------
     const state = {
-      pending: {},     // まだ送信していない回数 { U1: 3, ... }
-      inflight: null,  // 送信中（または再送待ち）のまとまり { id, counts }
-      mine: {},        // 自分の応援回数（この端末での累計）
-      displayed: {},   // 画面に表示している合計（減らないように管理する）
+      round: CONFIG.ROUND, // 今の回の番号
+      pending: {},         // まだ送信していない回数 { U1: 3, ... }
+      inflight: null,      // 送信中（または再送待ち）のまとまり { id, round, counts }
+      mine: {},            // 自分の応援回数（この端末での、今の回の累計）
+      displayed: {},       // 画面に表示している合計（減らないように管理する）
     };
-    CONFIG.TEAMS.forEach(t => {
-      state.pending[t.id] = 0;
-      state.mine[t.id] = 0;
-      state.displayed[t.id] = 0;
-    });
+
+    function clearCounts() {
+      state.inflight = null;
+      CONFIG.TEAMS.forEach(t => {
+        state.pending[t.id] = 0;
+        state.mine[t.id] = 0;
+        state.displayed[t.id] = 0;
+      });
+    }
+    clearCounts();
 
     const showTotals = !!CONFIG.TOTALS_CSV_URL;
     const errors = { send: false, fetch: false };
@@ -240,9 +251,23 @@
 
     function loadState() {
       try {
+        // テスト用：URLの最後に ?reset=1 を付けて開くと、この端末の記録だけ消す
+        const params = new URLSearchParams(location.search);
+        if (params.get('reset') === '1') {
+          localStorage.removeItem(STORAGE_KEY);
+          params.delete('reset');
+          const q = params.toString();
+          history.replaceState(null, '', location.pathname + (q ? '?' + q : '') + location.hash);
+          return;
+        }
+
         const raw = localStorage.getItem(STORAGE_KEY);
         if (!raw) return;
         const saved = JSON.parse(raw);
+
+        // 回の番号が変わっていたら、前の回の記録は使わない（＝0から）
+        if (saved.round !== CONFIG.ROUND) return;
+
         CONFIG.TEAMS.forEach(t => {
           state.pending[t.id] = toCount(saved.pending && saved.pending[t.id]);
           state.mine[t.id]    = toCount(saved.mine && saved.mine[t.id]);
@@ -258,6 +283,7 @@
     function saveState() {
       try {
         localStorage.setItem(STORAGE_KEY, JSON.stringify({
+          round: state.round,
           pending: state.pending,
           inflight: state.inflight,
           mine: state.mine,
@@ -265,6 +291,14 @@
       } catch (e) {
         // 保存できなくても動作は続ける
       }
+    }
+
+    // 回の番号が変わったとき：この端末の回数を0に戻す
+    function startNewRound(round) {
+      state.round = round;
+      clearCounts();
+      saveState();
+      renderAll();
     }
 
     // ---------- 画面 ----------
@@ -376,7 +410,7 @@
       });
 
       if (sum > 0) {
-        state.inflight = { id: makeId(), counts };
+        state.inflight = { id: makeId(), round: state.round, counts };
         saveState();
       }
     }
@@ -428,6 +462,11 @@
         if (!res.ok) throw new Error('HTTP ' + res.status);
         const totals = parseTotalsCsv(await res.text());
 
+        // シートに「ROUND,数字」があり、今の回と違えば、この端末の回数を0に戻す
+        if ('ROUND' in totals && Number.isInteger(totals.ROUND) && totals.ROUND !== state.round) {
+          startNewRound(totals.ROUND);
+        }
+
         CONFIG.TEAMS.forEach(t => {
           if (!(t.id in totals)) return;
           // 公開シートの反映は遅れるため、まだ反映されていない自分の分で表示が減らないよう、
@@ -445,7 +484,7 @@
       }
     }
 
-    // CSV（チーム,合計）を { U1: 123, ... } にする
+    // CSV（チーム,合計）を { U1: 123, ..., ROUND: 2 } にする
     function parseTotalsCsv(text) {
       const totals = {};
       text.split(/\r?\n/).forEach(line => {
