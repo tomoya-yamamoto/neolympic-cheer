@@ -127,11 +127,11 @@
 
       <button type="button" class="enter-btn" id="enter" disabled>入室する</button>
 
-      <div class="notice">
-        ・応援は <b>1台の端末・ふだん使うブラウザ</b> でしてね。<br>
-        ・このページを<b>ブックマーク</b>しておくと、次回もそのまま応援画面が開きます。<br>
-        ・別の端末やシークレットモードで開くと、別の人として数えられます。
-      </div>
+    <div class="notice">
+  ・応援は <b>1台の端末・ふだん使うブラウザ・1つのタブ</b> でしてね。<br>
+  ・このページを<b>ブックマーク</b>しておくと、次回もそのまま応援画面が開きます。<br>
+  ・別の端末やシークレットモードで開くと、別の人として数えられます。
+    </div>
     </section>
 
     <!-- ===== 応援画面 ===== -->
@@ -418,24 +418,65 @@
 
     // mode: 'no-cors' … Googleフォームは送信結果を読ませないため、届いたかはページから確認できない。
     // 通信が通ったら送れたとみなす。失敗したら同じ内容（同じ bid）で再送し、集計シート側で重複を除く。
+
+    // ---------- 送信 ----------
     async function sendCheers() {
       if (sending || !isConfigured()) return;
+
+      // 複数タブからの同時送信を抑止する
+      if (navigator.locks) {
+        try {
+          await navigator.locks.request(
+            'neolympic-send-lock',
+            { ifAvailable: true },
+            async lock => {
+              if (!lock) return;
+              await sendCheersCore_();
+            }
+          );
+        } catch (e) {
+          errors.send = true;
+          updateStatus();
+        }
+      } else {
+        // Web Locks非対応ブラウザでは従来方式
+        await sendCheersCore_();
+      }
+    }
+
+    async function sendCheersCore_() {
+      if (sending || !isConfigured()) return;
+
       prepareInflight();
       if (!queue.inflight) return;
 
       sending = true;
+
       try {
-        await fetch(CONFIG.FORM_RESPONSE_URL, { method: 'POST', mode: 'no-cors', body: buildFormBody() });
+        await fetch(CONFIG.FORM_RESPONSE_URL, {
+          method: 'POST',
+          mode: 'no-cors',
+          body: buildFormBody()
+        });
+
+        // no-corsではGoogleフォーム側の受付結果は確認できない。
+        // fetchがエラーなく完了した場合は送信済みとして扱う。
         queue.inflight = null;
         saveQueue();
+
         errors.send = false;
+
       } catch (e) {
+        // 失敗時は同じ送信IDのまま残し、次回再送する。
+        // GAS側ではlogの送信IDを照合して重複を除外する。
         errors.send = true;
+
       } finally {
         sending = false;
         updateStatus();
       }
     }
+
 
     function flushWithBeacon() {
       if (!isConfigured() || !navigator.sendBeacon) return;
