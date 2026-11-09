@@ -85,17 +85,10 @@
       color: var(--team);
     }
 
-    .total-label {
-      margin: 16px 0 0;
+    .notice {
+      margin: 16px 0;
       font-size: 0.8rem;
       color: var(--sub);
-    }
-
-    .total {
-      margin: 0 0 16px;
-      font-size: 2.6rem;
-      font-weight: 800;
-      font-variant-numeric: tabular-nums;
     }
 
     .cheer-btn {
@@ -173,32 +166,25 @@
       // フォームの質問の ID（事前入力URLに含まれる entry.数字）
       FORM_ENTRY_ID: 'entry.551747992',
 
-      // 回（ラウンド）の番号。リセットしたいときは数字を1つ上げる（1 → 2 → 3 …）
-      // 上げると、全員の「あなたの応援」が0に戻り、合計も新しい回の分だけ数え直しになる
-      // ※ TOTALS_CSV_URL のCSVに「ROUND,数字」の行がある場合は、そちらの数字が優先される
+      // 回（ラウンド）の番号。上げると、全員の端末の「あなたの応援」が0に戻る
+      // ※ チームの合計（スプレッドシート側）は戻らない。合計のリセットは GAS の resetForTest で行う
+      // ※ 上げた時点で、各端末の未送信の応援は破棄されるので、イベント開始前に行うこと
+      // ※ 送信データにも round が入るが、集計側（GAS）では使っていない
       ROUND: 1,
-
-      // 合計を表示するための、total シートを「ウェブに公開」したCSVのURL
-      // ウェブに公開できない場合は '' のままにする（合計は表示せず、自分の応援回数だけ表示）
-      TOTALS_CSV_URL: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQ2KBt0LzM4OgDKxDPaberUkfudyhsfrhIaQvzS8Z74bb4Q8zNtEl9mMKHU5VSHoRjLUEcrI41b1gj6/pub?gid=1091749797&single=true&output=csv',
 
       // クリックをまとめて送信する間隔（ミリ秒）。10000 推奨
       SEND_INTERVAL_MS: 10000,
 
-      // 全チームの合計を取得する間隔（ミリ秒）
-      // ウェブに公開したシートは反映まで数分かかることがあるため、短くしすぎても意味がない
-      FETCH_INTERVAL_MS: 30000,
-
       // 1秒あたりの最大クリック数（超えた分は無視）
       MAX_CLICKS_PER_SECOND: 10,
 
-      // 1回の送信で1チームあたり送る最大回数（集計側の上限と合わせる）
+      // 1回の送信で1チームあたり送る最大回数（GAS側の上限と合わせる）
       MAX_PER_TEAM_PER_REQUEST: 100,
 
-      // 合計を表示しないときに、合計の欄に出す文字
-      NO_TOTAL_LABEL: '合計は会場で発表します',
+      // カードに表示するお知らせ（合計はこのサイトには出さず、会場で発表する）
+      TOTAL_NOTICE: '合計は会場で発表します',
 
-      // チーム（id は集計シートのチーム名と一致させる）
+      // チーム（id は GAS の TEAMS・total シートのチーム名と一致させる）
       TEAMS: [
         { id: 'U1', name: 'U1', color: '#e63946' }, // 赤
         { id: 'U2', name: 'U2', color: '#2a9d5c' }, // 緑
@@ -213,9 +199,8 @@
     // 端末に保存するキー（未送信の回数・自分の応援回数を保存し、再読み込みしても失わない）
     const STORAGE_KEY = 'neolympic_cheer_v2';
 
-    const MSG_SEND_ERROR  = '通信が不安定です。応援は端末に保存され、あとで自動で送信されます。';
-    const MSG_FETCH_ERROR = '最新の合計を取得できませんでした。応援はそのまま続けられます。';
-    const MSG_NOT_SET     = 'フォームの設定がされていません（管理者向け：index.html の FORM_RESPONSE_URL と FORM_ENTRY_ID を設定してください）。';
+    const MSG_SEND_ERROR = '通信が不安定です。応援は端末に保存され、あとで自動で送信されます。';
+    const MSG_NOT_SET    = 'フォームの設定がされていません（管理者向け：index.html の FORM_RESPONSE_URL と FORM_ENTRY_ID を設定してください）。';
 
     // ---------- 状態 ----------
     const state = {
@@ -223,25 +208,16 @@
       pending: {},         // まだ送信していない回数 { U1: 3, ... }
       inflight: null,      // 送信中（または再送待ち）のまとまり { id, round, counts }
       mine: {},            // 自分の応援回数（この端末での、今の回の累計）
-      displayed: {},       // 画面に表示している合計（減らないように管理する）
     };
+    CONFIG.TEAMS.forEach(t => {
+      state.pending[t.id] = 0;
+      state.mine[t.id] = 0;
+    });
 
-    function clearCounts() {
-      state.inflight = null;
-      CONFIG.TEAMS.forEach(t => {
-        state.pending[t.id] = 0;
-        state.mine[t.id] = 0;
-        state.displayed[t.id] = 0;
-      });
-    }
-    clearCounts();
-
-    const showTotals = !!CONFIG.TOTALS_CSV_URL;
-    const errors = { send: false, fetch: false };
+    const errors = { send: false };
     const els = {};
     let clickTimes = [];
     let sending = false;
-    let fetching = false;
 
     // ---------- 端末への保存・読み込み ----------
     function toCount(v) {
@@ -293,14 +269,6 @@
       }
     }
 
-    // 回の番号が変わったとき：この端末の回数を0に戻す
-    function startNewRound(round) {
-      state.round = round;
-      clearCounts();
-      saveState();
-      renderAll();
-    }
-
     // ---------- 画面 ----------
     function buildCards() {
       const main = document.getElementById('teams');
@@ -311,8 +279,7 @@
         card.style.setProperty('--team', team.color);
         card.innerHTML = `
           <h2 class="team-name">${team.name}</h2>
-          <p class="total-label">${showTotals ? 'チーム合計' : CONFIG.NO_TOTAL_LABEL}</p>
-          <p class="total" data-role="total"${showTotals ? '' : ' hidden'}>0</p>
+          <p class="notice">${CONFIG.TOTAL_NOTICE}</p>
           <button type="button" class="cheer-btn" aria-label="${team.name}を応援する">応援する！</button>
           <p class="mine">あなたの応援：<strong data-role="mine">0</strong> 回</p>
         `;
@@ -320,17 +287,13 @@
         const btn = card.querySelector('.cheer-btn');
         btn.addEventListener('click', () => onCheer(team.id, card, btn));
 
-        els[team.id] = {
-          total: card.querySelector('[data-role="total"]'),
-          mine:  card.querySelector('[data-role="mine"]'),
-        };
+        els[team.id] = { mine: card.querySelector('[data-role="mine"]') };
         main.appendChild(card);
       });
     }
 
     function render(teamId) {
-      els[teamId].total.textContent = state.displayed[teamId].toLocaleString('ja-JP');
-      els[teamId].mine.textContent  = state.mine[teamId].toLocaleString('ja-JP');
+      els[teamId].mine.textContent = state.mine[teamId].toLocaleString('ja-JP');
     }
 
     function renderAll() {
@@ -343,7 +306,6 @@
       let msg = '';
       if (!isConfigured()) msg = MSG_NOT_SET;
       else if (errors.send) msg = MSG_SEND_ERROR;
-      else if (errors.fetch) msg = MSG_FETCH_ERROR;
 
       text.textContent = msg;
       box.hidden = !msg;
@@ -376,7 +338,6 @@
 
       state.pending[teamId]++;
       state.mine[teamId]++;
-      state.displayed[teamId]++; // 押した瞬間に合計も増やす
       saveState();
       render(teamId);
       spawnEmoji(card, btn);
@@ -426,7 +387,8 @@
     // mode: 'no-cors' にする理由：Googleフォームはほかのサイトからの送信結果を読ませないため。
     // 送信自体は届くが、結果（成功・失敗）はページから確認できない。
     // そのため「通信が成功したら送信できた」とみなす。通信自体が失敗したら同じ送信IDで再送し、
-    // 二重に届いても集計シートの UNIQUE で重複は加算しない。
+    // 二重に届いても GAS 側が送信IDを見て、重複は加算しない。
+    // ※ フォームを「ログイン必須」「1回のみ回答」にすると、断られても成功扱いになり応援が消えるので注意
     async function sendCheers() {
       if (sending || !isConfigured()) return;
 
@@ -451,52 +413,8 @@
       }
     }
 
-    // 合計の取得（total シートを「ウェブに公開」したCSVを読む）
-    async function fetchTotals() {
-      if (!showTotals || fetching || document.hidden) return;
-
-      fetching = true;
-      try {
-        const sep = CONFIG.TOTALS_CSV_URL.includes('?') ? '&' : '?';
-        const res = await fetch(CONFIG.TOTALS_CSV_URL + sep + 't=' + Date.now());
-        if (!res.ok) throw new Error('HTTP ' + res.status);
-        const totals = parseTotalsCsv(await res.text());
-
-        // シートに「ROUND,数字」があり、今の回と違えば、この端末の回数を0に戻す
-        if ('ROUND' in totals && Number.isInteger(totals.ROUND) && totals.ROUND !== state.round) {
-          startNewRound(totals.ROUND);
-        }
-
-        CONFIG.TEAMS.forEach(t => {
-          if (!(t.id in totals)) return;
-          // 公開シートの反映は遅れるため、まだ反映されていない自分の分で表示が減らないよう、
-          // 「今の表示」と「公開シートの合計＋未送信分」の大きい方を表示する
-          const unsent = state.pending[t.id] + (state.inflight && state.inflight.counts[t.id] ? state.inflight.counts[t.id] : 0);
-          state.displayed[t.id] = Math.max(state.displayed[t.id], totals[t.id] + unsent);
-        });
-        renderAll();
-        errors.fetch = false;
-      } catch (e) {
-        errors.fetch = true;
-      } finally {
-        fetching = false;
-        updateStatus();
-      }
-    }
-
-    // CSV（チーム,合計）を { U1: 123, ..., ROUND: 2 } にする
-    function parseTotalsCsv(text) {
-      const totals = {};
-      text.split(/\r?\n/).forEach(line => {
-        const [team, sum] = line.split(',').map(s => s.replace(/"/g, '').trim());
-        const n = Number(sum);
-        if (team && Number.isFinite(n)) totals[team] = n;
-      });
-      return totals;
-    }
-
     // 画面を閉じる・切り替えるときに、未送信分を送っておく
-    // （届いたか確認できないので送信中のまとまりは消さない。次回同じIDで再送し、集計シート側で重複は無視される）
+    // （届いたか確認できないので送信中のまとまりは消さない。次回同じIDで再送し、GAS側で重複は無視される）
     function flushWithBeacon() {
       if (!isConfigured() || !navigator.sendBeacon) return;
       prepareInflight();
@@ -510,15 +428,11 @@
     renderAll();
     updateStatus();
 
-    fetchTotals();
     sendCheers(); // 前回送れなかった分があれば送る
-
     setInterval(sendCheers, CONFIG.SEND_INTERVAL_MS);
-    setInterval(fetchTotals, CONFIG.FETCH_INTERVAL_MS);
 
     document.addEventListener('visibilitychange', () => {
       if (document.hidden) flushWithBeacon();
-      else fetchTotals();
     });
     window.addEventListener('pagehide', flushWithBeacon);
   </script>
